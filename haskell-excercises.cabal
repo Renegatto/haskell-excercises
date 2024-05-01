@@ -62,7 +62,13 @@ library
     exposed-modules:  MyLib
 
     -- Modules included in this library but not exported.
-    -- other-modules:
+    other-modules:
+      IV_Datatypes.I_EnumerationTypes
+      IV_Datatypes.II_ProductAndSumOfProductTypes
+      IV_Datatypes.III_RecordSyntax
+      IV_Datatypes.IV_ParametrizedTypes
+      IV_Datatypes.V_RecursiveDatatypes
+      IV_Datatypes.VI_TypeSynonymsAndWrappers
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
