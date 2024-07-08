@@ -7,6 +7,7 @@ import Data.Foldable (traverse_)
 import Control.Concurrent (threadDelay)
 import Utils.Cli qualified as Cli
 import System.Console.ANSI qualified as ANSI
+import qualified IV_Datatypes.I_EnumerationTypes.Solution as Solution
 
 data Init = MkInit
   { zero :: (Int,Int)
@@ -19,7 +20,7 @@ newtype Advance = MkAdvance
   ((Int,Int) ->
     Walker ->
     WalkerMessage ->
-    WalkerCommand)
+    (WalkerCommand, CurrentTask))
 
 runPls :: IO ()
 runPls = do
@@ -28,21 +29,22 @@ runPls = do
     (MkInit
       { zero = (0,0)
       , start = (5,5)
-      , target = (10,4)
+      , target = (7,15)
       , obstacles =
         [ (5,3)
         , (4,5)
-        , (7,6)
+        , (5,6)
+        , (7,10)
         ]
 
       })
-    dumbAdvance
-    (MkWalker (5,5) 20 N)
+    (MkAdvance Solution.advanceToTheTarget)
+    (MkWalker (5,5) 20 N Advance)
     Done
 
-dumbAdvance :: Advance
-dumbAdvance = MkAdvance \_ (MkWalker (_,y) _ _) _ ->
-  if y `mod` 4 /= 0 then Forward else TurnLeft
+-- dumbAdvance :: Advance
+-- dumbAdvance = MkAdvance \_ (MkWalker (_,y) _ _ _) _ ->
+--   if y `mod` 4 /= 0 then Forward else TurnLeft
 
 drawExecutedAdvance ::
   Init ->
@@ -51,16 +53,14 @@ drawExecutedAdvance ::
   WalkerMessage ->
   IO ()
 drawExecutedAdvance draw@(MkInit {obstacles, target}) advance walker msg = do
-    ANSI.saveCursor
     drawMap draw
-    ANSI.restoreCursor
-   -- putStr $ show $ fmap (\(MkWalker pos _ _,_,msg) -> (pos,msg)) $ take 7 executed
+   -- putStr $ show $ fmap (\(MkWalker pos _ _ task,cmd,msg) -> (pos,task,cmd,msg)) $ take 7 $ drop 7 executed
     drawAdvance
       (\pos -> Cli.drawThing [(pos,"x")])
       points
+    ANSI.setCursorPosition 0 0
   where
-    points = take 10 
-      $ (\(w,_,_) -> w)
+    points = (\(w,_,_) -> w)
       <$> executed
     executed = runWithAdvanceToTheTarget
       obstacles
@@ -73,16 +73,13 @@ drawExecutedAdvance draw@(MkInit {obstacles, target}) advance walker msg = do
 drawMap :: Init -> IO ()
 drawMap (MkInit {zero, start, target, obstacles}) = do
   Cli.drawThing $ (,".") <$> Cli.square zero 20 20
-  ANSI.restoreCursor
   Cli.drawThing $ (,"ж") <$> obstacles
-  ANSI.restoreCursor
   Cli.drawThing $ [(target,"O"), (start,"o")]
-  ANSI.restoreCursor
 
 drawAdvance :: ((Int,Int) -> IO ()) -> [Walker] -> IO ()
-drawAdvance draw = traverse_ \(MkWalker pos _ _) -> do
+drawAdvance draw = traverse_ \(MkWalker pos _ _ _) -> do
   draw pos
-  threadDelay 1000
+  threadDelay 500_000 -- 0.5s
 
 runWithAdvanceToTheTarget
   :: [(Int,Int)] -- obstacles
@@ -96,14 +93,14 @@ runWithAdvanceToTheTarget obstacles walker target (MkAdvance advance) initMsg =
     (\(w,cmd,msg) -> ((w,cmd,msg),(w,msg))) <$> advanceToTheTargetWith
       (advance target)
       obstacles
-      (\(MkWalker pos _ _) -> pos == target)
+      (\(MkWalker pos _ _ _) -> pos == target)
       walker'
       msg'
     )
     (walker,initMsg)
 
 advanceToTheTargetWith
-  :: (Walker -> WalkerMessage -> WalkerCommand)
+  :: (Walker -> WalkerMessage -> (WalkerCommand, CurrentTask))
   -> [(Int,Int)]
   -> (Walker -> Bool)
   -> Walker
@@ -113,26 +110,27 @@ advanceToTheTargetWith advance obstacles isDone walker msg
   | isDone walker = Nothing
   | otherwise = 
     let
-      (msg', walker') = evalCommand cmd
-    in Just (walker',cmd,msg')
+      (msg', walker'') = evalCommand cmd
+    in Just (walker'',cmd,msg')
   where
-    cmd = advance walker msg
-    MkWalker pos fuel facing = walker
+    (cmd, task') = advance walker msg
+    MkWalker pos fuel facing _ = walker
+    walker' = MkWalker pos fuel facing task'
     evalCommand
       | movementFuelCost <= fuel = evalAnyCommand
       | otherwise = \case
-        DoNothing -> (Done,walker)
-        Refuel -> (Done,MkWalker pos (fuel + fuelPerRefuel) facing)
-        _ -> (NotEnoughFuel,walker)
+        DoNothing -> (Done,walker')
+        Refuel -> (Done,MkWalker pos (fuel + fuelPerRefuel) facing task')
+        _ -> (NotEnoughFuel,walker')
     evalAnyCommand = \case
-      TurnLeft -> (Done,MkWalker pos (pred fuel) (left facing))
-      TurnRight -> (Done,MkWalker pos (pred fuel) (right facing))
+      TurnLeft -> (Done,MkWalker pos (pred fuel) (left facing) task')
+      TurnRight -> (Done,MkWalker pos (pred fuel) (right facing) task')
       Forward
         | pointInFront pos facing `elem` obstacles ->
-          (IAmFacingObstacle,walker)
-        | otherwise -> (Done,MkWalker (pointInFront pos facing) (pred fuel) facing)
-      Refuel -> (Done,MkWalker pos (fuel + fuelPerRefuel) facing)
-      DoNothing -> (Done,walker)
+          (IAmFacingObstacle,walker')
+        | otherwise -> (Done,MkWalker (pointInFront pos facing) (pred fuel) facing task')
+      Refuel -> (Done,MkWalker pos (fuel + fuelPerRefuel) facing task')
+      DoNothing -> (Done,walker')
 
 pointInFront :: (Int,Int) -> Facing -> (Int,Int)
 pointInFront (x,y) = \case

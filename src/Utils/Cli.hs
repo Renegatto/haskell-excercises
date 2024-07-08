@@ -20,13 +20,13 @@ lineRight (x0,y0) len = ((,y0) <$> [min x0 end..max x0 end],(end,y0))
   where end = x0 + len
 
 square :: (Int,Int) -> Int -> Int -> [(Int,Int)]
-square from height width =
+square bl height width =
   let
-    (vert0, a) = lineUp from height
-    (hor0, b) = lineRight from width
-    (vert1, _) = lineUp b height
-    (hor1, _) = lineRight a width
-  in vert0 <> hor0 <> vert1 <> hor1
+    (left, tl) = lineUp bl height
+    (right, _) = lineUp br height
+    (bot, br) = lineRight bl width
+    (top, _) = lineRight tl width
+  in left <> right <> bot <> top
 
 squareToDraw = (,"o") <$> square (0,0) 5 10
 
@@ -37,12 +37,13 @@ draw2 = do
   ANSI.clearScreen
   ANSI.setCursorPosition 0 0
   putStr "O"
-  drawThing
-    [ ((0,0),"00")
-    , ((10,0),"10")
-    , ((0,10),"01")
-    , ((10,10),"11")
-    ]
+  drawThing squareToDraw
+  -- drawThing
+  --   [ ((0,0),"00")
+  --   , ((10,0),"10")
+  --   , ((0,10),"01")
+  --   , ((10,10),"11")
+  --   ]
 
 draw :: IO ()
 draw = do
