@@ -6,6 +6,12 @@ data Walker = MkWalker
   (Int,Int) -- a position on XY plane
   Fuel -- a fuel level
   Facing -- a facing
+  CurrentTask
+
+data CurrentTask
+  = AvoidObstacle
+  | Advance
+  deriving Show
 
 newtype Fuel = MkFuel Int
   deriving (Num, Show, Eq, Ord, Enum)
@@ -42,7 +48,7 @@ advanceToTheTarget ::
   (Int,Int) ->
   Walker ->
   WalkerMessage ->
-  WalkerCommand
+  (WalkerCommand, CurrentTask)
 advanceToTheTarget targetPosition walker message = undefined
 
 -- | Based on the starting point and a sequence of commands predicts
