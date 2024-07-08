@@ -8,7 +8,7 @@ data Walker = MkWalker
   Facing -- a facing
 
 newtype Fuel = MkFuel Int
-  deriving (Num, Show, Eq, Ord)
+  deriving (Num, Show, Eq, Ord, Enum)
 
 data WalkerCommand
   = TurnLeft
